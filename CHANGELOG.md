@@ -7,6 +7,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-09
+
+### Added
+- `access.yml` (schema v1) and `pipeline-platform access validate|render|who`: sections per team
+  (Vault path prefixes, Kubernetes namespaces) with explicit rights for teams and single users;
+  renders Vault policies, JWT roles for CI projects, `apply.sh` and Kubernetes `RoleBinding`s.
+
+### Fixed
+- Generated pipelines: value secrets (registry credentials, tokens) carry `file: false`; GitLab's default
+  `file: true` handed jobs a file path instead of the value.
+- `pp`: AppRole credentials win over an ambient `VAULT_TOKEN`; Nexus no longer sends a Bearer token;
+  redirects that change scheme drop credentials; downloads are streamed; a malformed `--prop` is a readable error.
+
 ## [1.1.0] - 2026-10-09
 
 ### Added

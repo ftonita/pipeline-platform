@@ -39,6 +39,10 @@ jobs:
           curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz
           sudo mv kubeconform /usr/local/bin/
       - run: helm lint examples/gitops-repo/charts/app -f examples/gitops-repo/apps/orders-api/prod/values.yaml
+      - name: Access example renders valid RBAC
+        run: |
+          pip install -q . && pipeline-platform access render --config examples/access/access.yml --out "$RUNNER_TEMP/access"
+          kubeconform -strict -summary "$RUNNER_TEMP/access/k8s/rbac.yaml"
       - name: Render and validate every environment
         run: |
           for env in dev stage prod; do

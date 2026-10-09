@@ -180,6 +180,36 @@ ansible-role:apply:
       file: true
 ```
 
+## Access by team (Vault, Kubernetes)
+
+Instead of one "view/read" policy per tool, describe **sections** and **who owns them** in one reviewed file, [`access.yml`](examples/access/access.yml). A section is a Vault path prefix or a Kubernetes namespace; rights are named per section, for a team or for one person.
+
+```yaml
+teams:
+  payments: { group: payments }          # IdP / OIDC group
+  orders:   { members: [alice, bob] }    # or named people
+grants:
+  - team: payments
+    vault:
+      - { path: ci/payments/*, can: [read, list] }                       # KV v2: only this section
+      - { path: database/creds/payments-ro, can: [read], engine: raw }   # any other engine
+    k8s:
+      - { namespace: payments-dev,  role: edit }
+      - { namespace: payments-prod, role: view }
+  - user: dave                           # one person, one section
+    vault: [{ path: ci/orders/*, can: [read] }]
+ci:                                      # CI projects read with their team's rights
+  - { project: shop/payments-api, team: payments, audience: "https://vault.example.com" }
+```
+
+| Command | Result |
+|---|---|
+| `pipeline-platform access validate` | Checks the file; rejects unknown teams, `sudo`, `cluster-admin`, namespace wildcards and administrative Vault paths (`sys/`, `auth/`, `identity/`, root `*`). |
+| `pipeline-platform access render --out access-out` | `vault/policies/*.hcl`, `vault/roles/ci-*.json` (JWT roles bound to project and protected refs), `vault/apply.sh`, `k8s/rbac.yaml` (one `RoleBinding` per team or person and namespace). |
+| `pipeline-platform access who alice` | What a person can do: own grants plus those of their teams. |
+
+Review the rendered files in a merge request, then apply: `sh access-out/vault/apply.sh` and `kubectl apply -f access-out/k8s/rbac.yaml`. Notes: a team with `group` is bound as a group (Vault external group + Kubernetes `Group`), a team with `members` as individual users. Vault uses only the most specific matching path, so the renderer repeats the rights of wider globs in narrower rules (`ci/*` read + `ci/platform/*` write keeps read under `ci/platform/`). Nexus / Artifactory are not covered yet.
+
 ## Good to know
 
 | Symptom | Reason and fix |
@@ -291,6 +321,7 @@ Reproduce with `pip install -e ".[dev]" ansible-core ansible-lint && pytest` (se
 - `pp.py` against a fake Vault, Nexus and Artifactory server: JWT / AppRole / token login, KV v1/v2 and dynamic engines, one read per path, token revocation, multi-line values, redirects without credentials, error messages without secrets.
 - The GitLab templates and every example validate against **GitLab's official CI JSON Schema**; every `extends` resolves; the scripts of the Nexus / Artifactory blocks run with a stub `pp`; the **Ansible role and playbook blocks run for real** (`ansible-playbook` on localhost: dry run changes nothing, apply is idempotent); the examples pass `ansible-lint`.
 - The Jenkins steps are compiled and **executed by real Groovy** with a mocked pipeline DSL, against the same fake servers, real shell and real Ansible (secret handling, quoting, cleanup).
+- `access.yml`: schema and semantic rejections, golden Vault policies / roles / RBAC (the RBAC is also checked with `kubeconform` in GitHub Actions); the generated Vault HCL and `apply.sh` were never applied to a real Vault.
 - The full platform: schema accept/reject cases, context detection, job selection for every context, all three deploy methods, golden files of 12 generated pipelines. Verified in GitHub Actions (first run, 2026-10-09, before the blocks were added): tests on Python 3.10 and 3.12, `helm lint`, `helm template` and `kubeconform -strict` on the example chart.
 
 **Not** verified (no GitLab, Jenkins, Vault, Nexus, Artifactory, Kubernetes or Docker daemon was available):
@@ -308,7 +339,8 @@ gitlab/                      GitLab blocks and ready pipelines (vault, nexus, ar
 vars/                        Jenkins shared library steps (+ resources/ below, per Jenkins convention)
 resources/pp.py              the shared tool: Vault, Nexus, Artifactory (stdlib only)
 pipeline.yml                 GitLab entrypoint of the full platform
-src/pipeline_platform/       full platform: schema, config defaults, context, generator, gitops, cli
+src/pipeline_platform/       full platform (schema, config defaults, context, generator, gitops, cli) and access.py
+examples/access/             access.yml (teams, sections, rights) + rendered output
 examples/gitlab/             role, playbook and blocks examples
 examples/jenkins/            matching Jenkinsfiles
 examples/consumer-app/       .platform.yml variants + expected generated pipelines

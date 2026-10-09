@@ -1,0 +1,16 @@
+{
+  "role_type": "jwt",
+  "user_claim": "project_path",
+  "policies": [
+    "team-orders"
+  ],
+  "bound_audiences": [
+    "https://vault.example.com"
+  ],
+  "token_explicit_max_ttl": 900,
+  "bound_claims_type": "glob",
+  "bound_claims": {
+    "project_path": "shop/orders-api",
+    "ref_protected": "true"
+  }
+}

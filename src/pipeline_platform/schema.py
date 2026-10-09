@@ -23,8 +23,8 @@ class Issue:
         return f"{self.path or '<root>'}: {self.message}"
 
 
-def load_schema() -> dict[str, Any]:
-    text = resources.files("pipeline_platform").joinpath("schemas", _SCHEMA_FILE).read_text("utf-8")
+def load_schema(name: str = _SCHEMA_FILE) -> dict[str, Any]:
+    text = resources.files("pipeline_platform").joinpath("schemas", name).read_text("utf-8")
     return json.loads(text)
 
 
@@ -35,9 +35,9 @@ def _format_path(parts: Any) -> str:
     return out
 
 
-def validate_schema(doc: Any) -> list[Issue]:
-    """Structural validation against the v1 JSON Schema."""
-    validator = Draft202012Validator(load_schema())
+def validate_schema(doc: Any, name: str = _SCHEMA_FILE) -> list[Issue]:
+    """Structural validation against a JSON Schema shipped in the package (default: platform v1)."""
+    validator = Draft202012Validator(load_schema(name))
     issues = [Issue(_format_path(e.absolute_path), e.message) for e in validator.iter_errors(doc)]
     return sorted(issues, key=lambda i: (i.path, i.message))
 

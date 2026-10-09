@@ -1,4 +1,4 @@
-"""Regenerate examples/consumer-app/expected/*.yml. Review the diff before committing."""
+"""Regenerate the golden files (consumer-app pipelines, access output). Review the diff before committing."""
 
 from __future__ import annotations
 
@@ -16,3 +16,19 @@ for variant in VARIANTS:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(render(variant, ctx_name), encoding="utf-8")
         print("wrote", path.relative_to(ROOT))
+
+# examples/access/expected
+import shutil  # noqa: E402
+
+import yaml  # noqa: E402
+
+from pipeline_platform import access  # noqa: E402
+
+acc = ROOT / "examples" / "access"
+shutil.rmtree(acc / "expected", ignore_errors=True)
+for rel, text in access.render(yaml.safe_load((acc / "access.yml").read_text(encoding="utf-8"))).items():
+    (acc / "expected" / rel).parent.mkdir(parents=True, exist_ok=True)
+    (acc / "expected" / rel).write_text(text, encoding="utf-8")
+    if rel.endswith(".sh"):
+        (acc / "expected" / rel).chmod(0o755)
+    print("wrote", (acc / "expected" / rel).relative_to(ROOT))

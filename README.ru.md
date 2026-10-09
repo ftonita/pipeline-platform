@@ -180,6 +180,36 @@ ansible-role:apply:
       file: true
 ```
 
+## Доступ по командам (Vault, Kubernetes)
+
+Вместо одной политики «view/read» на сервис опишите **разделы** и **кому они принадлежат** в одном проверяемом файле [`access.yml`](examples/access/access.yml). Раздел — это префикс пути в Vault или namespace в Kubernetes; права задаются явно на раздел, для команды или для одного человека.
+
+```yaml
+teams:
+  payments: { group: payments }          # группа IdP / OIDC
+  orders:   { members: [alice, bob] }    # или поимённо
+grants:
+  - team: payments
+    vault:
+      - { path: ci/payments/*, can: [read, list] }                       # KV v2: только этот раздел
+      - { path: database/creds/payments-ro, can: [read], engine: raw }   # любой другой движок
+    k8s:
+      - { namespace: payments-dev,  role: edit }
+      - { namespace: payments-prod, role: view }
+  - user: dave                           # один человек, один раздел
+    vault: [{ path: ci/orders/*, can: [read] }]
+ci:                                      # CI-проекты читают с правами своей команды
+  - { project: shop/payments-api, team: payments, audience: "https://vault.example.com" }
+```
+
+| Команда | Результат |
+|---|---|
+| `pipeline-platform access validate` | Проверяет файл; отклоняет неизвестные команды, `sudo`, `cluster-admin`, маски в namespace и административные пути Vault (`sys/`, `auth/`, `identity/`, корневой `*`). |
+| `pipeline-platform access render --out access-out` | `vault/policies/*.hcl`, `vault/roles/ci-*.json` (JWT-роли, привязанные к проекту и защищённым веткам), `vault/apply.sh`, `k8s/rbac.yaml` (один `RoleBinding` на команду или человека и namespace). |
+| `pipeline-platform access who alice` | Что может человек: его личные права плюс права его команд. |
+
+Проверьте сгенерированные файлы в merge request и примените: `sh access-out/vault/apply.sh` и `kubectl apply -f access-out/k8s/rbac.yaml`. Примечания: команда с `group` привязывается как группа (внешняя группа Vault + `Group` в Kubernetes), команда с `members` — как отдельные пользователи. Vault применяет только самое специфичное правило пути, поэтому генератор повторяет права более широких масок в узких правилах (`ci/*` read + `ci/platform/*` write сохраняют read внутри `ci/platform/`). Nexus / Artifactory пока не охвачены.
+
 ## Полезно знать
 
 | Симптом | Причина и решение |
@@ -291,6 +321,7 @@ Jenkins (AppRole): создайте `auth/approle/role/ci-jenkins` с той ж�
 - `pp.py` против фейкового сервера Vault, Nexus и Artifactory: вход по JWT / AppRole / токену, KV v1/v2 и динамические движки, одно чтение на путь, отзыв токена, многострочные значения, редиректы без учётных данных, сообщения об ошибках без секретов.
 - Шаблоны GitLab и все примеры проходят проверку по **официальной JSON-схеме GitLab CI**; все `extends` разрешаются; скрипты модулей Nexus / Artifactory выполняются с подставным `pp`; модули Ansible для роли и плейбука **выполняются по-настоящему** (`ansible-playbook` на localhost: пробный прогон ничего не меняет, применение идемпотентно); примеры проходят `ansible-lint`.
 - Шаги Jenkins компилируются и **выполняются настоящим Groovy** с подставной реализацией DSL пайплайна, против тех же фейковых серверов, настоящего shell и настоящего Ansible (работа с секретами, экранирование, очистка).
+- `access.yml`: отклонение неверных схем и семантики, эталонные политики Vault / роли / RBAC (RBAC дополнительно проверяется `kubeconform` в GitHub Actions); сгенерированные HCL Vault и `apply.sh` ни разу не применялись к настоящему Vault.
 - Полная платформа: допустимые и недопустимые схемы, определение контекста, выбор джоб для каждого контекста, все три способа деплоя, эталонные файлы 12 сгенерированных пайплайнов. Проверено в GitHub Actions (первый запуск 2026-10-09, до добавления модулей): тесты на Python 3.10 и 3.12, `helm lint`, `helm template` и `kubeconform -strict` на примере чарта.
 
 **Не** проверено (не было GitLab, Jenkins, Vault, Nexus, Artifactory, Kubernetes и Docker-демона):
@@ -308,7 +339,8 @@ gitlab/                      модули и готовые пайплайны G
 vars/                        шаги общей библиотеки Jenkins (+ resources/ ниже, по соглашению Jenkins)
 resources/pp.py              общий инструмент: Vault, Nexus, Artifactory (только стандартная библиотека)
 pipeline.yml                 точка входа GitLab для полной платформы
-src/pipeline_platform/       полная платформа: схема, значения по умолчанию, контекст, генератор, gitops, cli
+src/pipeline_platform/       полная платформа (схема, значения по умолчанию, контекст, генератор, gitops, cli) и access.py
+examples/access/             access.yml (команды, разделы, права) + результат генерации
 examples/gitlab/             примеры: роль, плейбук, набор модулей
 examples/jenkins/            соответствующие Jenkinsfile
 examples/consumer-app/       варианты .platform.yml + ожидаемые сгенерированные пайплайны

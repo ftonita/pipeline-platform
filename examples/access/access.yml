@@ -1,0 +1,46 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ftonita/pipeline-platform/v1/src/pipeline_platform/schemas/access.v1.schema.json
+# Synthetic example. Teams own sections: a Vault path prefix and Kubernetes namespaces.
+version: 1
+
+teams:
+  payments:
+    group: payments            # IdP / OIDC group; every member of it gets the team's rights
+  orders:
+    members: [alice, bob]      # no IdP group: the people are named explicitly
+  platform:
+    group: platform-sre
+
+grants:
+  - team: payments
+    vault:
+      - { path: ci/payments/*, can: [read, list] }                  # KV v2: only the payments section
+      - { path: database/creds/payments-ro, can: [read], engine: raw }
+    k8s:
+      - { namespace: payments-dev, role: edit }
+      - { namespace: payments-prod, role: view }
+
+  - team: orders
+    vault:
+      - { path: ci/orders/*, can: [read, list] }
+    k8s:
+      - { namespace: orders-dev, role: edit }
+      - { namespace: orders-prod, role: view }
+
+  - team: platform                  # the platform team sees everything read-only, edits the CI section
+    vault:
+      - { path: ci/*, can: [read, list] }
+      - { path: ci/platform/*, can: [create, update, delete] }
+    k8s:
+      - { namespace: payments-prod, role: admin }
+      - { namespace: orders-prod, role: admin }
+
+  - user: dave                      # a single person, a single section, read only
+    vault:
+      - { path: ci/orders/*, can: [read] }
+    k8s:
+      - { namespace: orders-dev, role: view }
+
+# CI projects read secrets with their team's rights (JWT roles, bound to project and protected refs)
+ci:
+  - { project: shop/payments-api, team: payments, audience: "https://vault.example.com" }
+  - { project: shop/orders-api, team: orders, audience: "https://vault.example.com" }
