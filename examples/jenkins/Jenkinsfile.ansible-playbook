@@ -1,0 +1,9 @@
+// Playbook repository: this is the whole pipeline.
+@Library('pipeline-platform@v1') _
+
+ansiblePlaybookPipeline(
+    playbook: 'site.yml',               // default
+    inventory: 'inventories/prod',      // drop this line for lint + syntax checks only
+    sshKeyId: 'deploy-ssh',             // Jenkins credential "SSH Username with private key" (optional)
+    args: ['-e', 'motd_text=hello'],    // optional extra ansible-playbook arguments
+)

@@ -7,6 +7,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-09
+
+### Added
+- Building blocks for GitLab CI (`gitlab/*.yml`): Vault (`.vault`, `.vault-export`), Nexus, Artifactory,
+  Kaniko image build, Ansible (`.ansible-role`, `.ansible-playbook`, `.ansible-lint`, `-check` / `-syntax`).
+- Ready pipelines for an Ansible role repository and an Ansible playbook repository.
+- Jenkins shared library (`vars/*.groovy`) with the same capabilities, including `ansibleRolePipeline` and
+  `ansiblePlaybookPipeline`.
+- `resources/pp.py`, the dependency-free tool behind both: `pp vault export` (KV v1/v2, dynamic engines,
+  JWT / AppRole / token), `pp nexus put|get`, `pp artifactory put|get`. Installed in the Docker image.
+- Examples in `examples/gitlab` and `examples/jenkins`; README in English and Russian.
+- Tests for `pp`, the GitLab templates (including real Ansible runs) and the Jenkins steps (real Groovy).
+
+### Changed
+- README restructured around the three layers (blocks, ready pipelines, full platform).
+- `.gitignore` covers `vault.env` and `.vault-files/`.
+
 ## [1.0.0] - 2026-10-08
 
 ### Added

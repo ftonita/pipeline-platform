@@ -10,8 +10,18 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "${{ matrix.python }}" }
-      - run: pip install -e ".[dev]"
+      - run: pip install -e ".[dev]" ansible-core "ansible-lint==26.9.0"
       - run: ruff check .
+      - name: Ansible examples pass ansible-lint
+        run: |
+          for d in examples/gitlab/ansible-role examples/gitlab/ansible-playbook; do (cd "$d" && ansible-lint); done
+      - name: Fetch Groovy (compiles and runs the Jenkins steps in tests)
+        run: |
+          mkdir -p "$RUNNER_TEMP/groovy" && cd "$RUNNER_TEMP/groovy"
+          m=https://repo.maven.apache.org/maven2/org/apache/groovy
+          curl -fsSLO $m/groovy/4.0.22/groovy-4.0.22.jar
+          curl -fsSLO $m/groovy-json/4.0.22/groovy-json-4.0.22.jar
+          echo "GROOVY_CP=$PWD/groovy-4.0.22.jar:$PWD/groovy-json-4.0.22.jar" >> "$GITHUB_ENV"
       - name: Fetch GitLab's official CI JSON Schema
         run: |
           curl -fsSL -o gitlab-ci.schema.json \

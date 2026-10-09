@@ -5,3 +5,7 @@ __pycache__/
 .coverage
 child-pipeline.yml
 gitlab-ci.schema.json
+
+# secrets written by `pp vault export`
+vault.env
+.vault-files/

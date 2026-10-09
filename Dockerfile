@@ -1,4 +1,5 @@
-# Image used by `platform:generate` and by the ArgoCD deploy job (git + argocd CLI).
+# Image used by `platform:generate`, the ArgoCD deploy job (git + argocd CLI) and the
+# Vault / Nexus / Artifactory blocks in gitlab/*.yml (`pp`).
 FROM python:3.12-slim
 
 ARG ARGOCD_VERSION=v2.12.4
@@ -13,6 +14,8 @@ WORKDIR /opt/pipeline-platform
 COPY pyproject.toml README.md ./
 COPY src ./src
 RUN pip install --no-cache-dir .
+COPY resources/pp.py /usr/local/bin/pp
+RUN chmod 0755 /usr/local/bin/pp && pp --version
 
 # GitLab runs jobs with its own uid; keep the image usable without root-only paths.
 USER 1000

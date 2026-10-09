@@ -1,0 +1,22 @@
+# Build and push a container image with Kaniko (no Docker daemon, no privileged runner).
+# Works the same for Nexus and Artifactory registries: only the variable values differ.
+#
+# Variables:  REGISTRY_HOST (nexus.example.com:8082), IMAGE_NAME (shop/orders-api)
+# Secrets:    REGISTRY_USER, REGISTRY_PASSWORD
+# Optional:   IMAGE_TAG (default: short commit sha), DOCKERFILE, CONTEXT,
+#             KANIKO_ARGS (e.g. "--no-push" for a build-only check on merge requests)
+# Result:     $REGISTRY_HOST/$IMAGE_NAME:$IMAGE_TAG (and :$CI_COMMIT_TAG on tag pipelines)
+
+.kaniko-build:
+  image:
+    name: gcr.io/kaniko-project/executor:v1.23.2-debug
+    entrypoint: [""]
+  script:
+    - mkdir -p /kaniko/.docker
+    - |
+      AUTH=$(printf '%s:%s' "$REGISTRY_USER" "$REGISTRY_PASSWORD" | base64 | tr -d '\n')
+      printf '{"auths":{"%s":{"auth":"%s"}}}' "$REGISTRY_HOST" "$AUTH" > /kaniko/.docker/config.json
+    - |
+      /kaniko/executor --context "${CONTEXT:-.}" --dockerfile "${DOCKERFILE:-Dockerfile}" \
+        --destination "$REGISTRY_HOST/$IMAGE_NAME:${IMAGE_TAG:-$CI_COMMIT_SHORT_SHA}" \
+        ${CI_COMMIT_TAG:+--destination "$REGISTRY_HOST/$IMAGE_NAME:$CI_COMMIT_TAG"} ${KANIKO_ARGS:-}

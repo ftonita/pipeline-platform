@@ -1,0 +1,61 @@
+# Pick blocks, combine with `extends`. Every block is documented at the top of its file.
+include:
+  - project: platform/pipeline-platform
+    ref: v1
+    file: [gitlab/vault.yml, gitlab/docker.yml, gitlab/nexus.yml, gitlab/artifactory.yml]
+
+stages: [build, publish, deploy]
+
+variables:
+  REGISTRY_HOST: nexus.example.com:8082
+  IMAGE_NAME: shop/orders-api
+  NEXUS_URL: https://nexus.example.com
+  ARTIFACTORY_URL: https://artifactory.example.com
+
+# 1. Image -> Nexus (or Artifactory: only REGISTRY_HOST / IMAGE_NAME change). Credentials from Vault.
+docker:build:
+  extends: [.vault, .kaniko-build]
+  stage: build
+  secrets:
+    REGISTRY_USER:     { vault: nexus/docker/username@ci, file: false }   # path/field@mount
+    REGISTRY_PASSWORD: { vault: nexus/docker/password@ci, file: false }
+
+# 2. Files -> Nexus raw repository (the files come from the artifacts of an earlier job).
+package:
+  stage: build
+  image: alpine:3.20
+  script: [mkdir -p dist, tar czf dist/app.tgz src]
+  artifacts: { paths: [dist/] }
+
+nexus:upload:
+  extends: [.vault, .nexus-put]
+  stage: publish
+  needs: [package]
+  variables: { NEXUS_REPO: raw-releases, NEXUS_FILES: "dist/*.tgz" }
+  secrets:
+    NEXUS_USER:     { vault: nexus/ci/username@ci, file: false }
+    NEXUS_PASSWORD: { vault: nexus/ci/password@ci, file: false }
+
+# 3. Same for Artifactory, with a token from plain masked CI/CD variables (no Vault needed).
+artifactory:upload:
+  extends: .artifactory-put
+  stage: publish
+  needs: [package]
+  variables: { ARTIFACTORY_REPO: generic-local, ARTIFACTORY_FILES: "dist/*.tgz" }
+
+# 4. Any engine / auth method, values handed to later jobs: one export job, many consumers.
+vault:export:
+  extends: .vault-export
+  stage: build
+  variables:
+    VAULT_ENV: |
+      DB_USER=raw:database/creds/orders-ro#username
+      DB_PASSWORD=raw:database/creds/orders-ro#password
+    VAULT_FILES: |
+      KUBECONFIG=ci/k8s/prod#kubeconfig
+
+migrate:
+  stage: deploy
+  image: alpine/k8s:1.30.4
+  needs: [vault:export]          # DB_USER, DB_PASSWORD and KUBECONFIG (a file path) arrive as variables
+  script: [kubectl get pods]

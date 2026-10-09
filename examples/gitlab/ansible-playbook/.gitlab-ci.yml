@@ -1,0 +1,10 @@
+# Playbook repository: this is the whole pipeline.
+include:
+  - project: platform/pipeline-platform
+    ref: v1
+    file: [gitlab/ansible.yml, gitlab/ansible-playbook.yml]
+
+variables:
+  ANSIBLE_INVENTORY: inventories/prod   # remove this line for lint + syntax checks only
+  ANSIBLE_PLAYBOOK: site.yml            # default
+  ANSIBLE_ARGS: -e motd_text=hello      # optional extra arguments

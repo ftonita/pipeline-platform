@@ -1,0 +1,35 @@
+// Pick steps and put them in your own stages. Every step is documented at the top of its file in vars/.
+@Library('pipeline-platform@v1') _
+
+pipeline {
+    agent any
+    stages {
+        stage('Build') {
+            steps {
+                sh 'mkdir -p dist && tar czf dist/app.tgz src'
+                // Image -> Nexus (or Artifactory: only registry/image change). Needs docker on the agent.
+                dockerBuildPush(registry: 'nexus.example.com:8082', image: 'shop/orders-api', credentialsId: 'nexus-ci')
+            }
+        }
+        stage('Publish') {
+            steps {
+                nexusPut(url: 'https://nexus.example.com', repo: 'raw-releases', files: 'dist/*.tgz',
+                         dest: "orders-api/${env.BUILD_NUMBER}", credentialsId: 'nexus-ci')
+                artifactoryPut(url: 'https://artifactory.example.com', repo: 'generic-local', files: 'dist/*.tgz',
+                               dest: "orders-api/${env.BUILD_NUMBER}", props: [build: env.BUILD_NUMBER],
+                               tokenId: 'artifactory-token')
+            }
+        }
+        stage('Deploy') {
+            steps {
+                // Any Vault engine; the values exist only inside the block (single quotes: the shell reads them).
+                vaultSecrets(url: 'https://vault.example.com', credentialsId: 'vault-approle',
+                             env:   [DB_PASSWORD: 'apps/orders/prod#db_password',
+                                     AWS_KEY:     'raw:aws/creds/deploy#access_key'],
+                             files: [KUBECONFIG:  'ci/k8s/prod#kubeconfig']) {
+                    sh 'kubectl get pods'
+                }
+            }
+        }
+    }
+}

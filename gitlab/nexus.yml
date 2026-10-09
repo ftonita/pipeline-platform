@@ -1,0 +1,20 @@
+# Nexus upload / download (raw and maven repositories).
+#
+# Variables:  NEXUS_URL, NEXUS_REPO, NEXUS_FILES (globs ok), NEXUS_DEST (optional)
+# Secrets:    NEXUS_USER + NEXUS_PASSWORD (a Nexus user token works as that pair; masked CI/CD variables or Vault, see vault.yml)
+# Files to upload come from the artifacts of earlier jobs.
+
+variables:
+  PLATFORM_IMAGE: registry.example.com/platform/pipeline-platform:v1
+
+# NEXUS_DEST defaults to <project>/<tag or short sha>
+.nexus-put:
+  image: $PLATFORM_IMAGE
+  script:
+    - pp nexus put "$NEXUS_REPO" $NEXUS_FILES --dest "${NEXUS_DEST:-$CI_PROJECT_NAME/${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA}}"
+
+# Variables: NEXUS_PATH (path inside the repository), NEXUS_OUT (local file, default: basename)
+.nexus-get:
+  image: $PLATFORM_IMAGE
+  script:
+    - pp nexus get "$NEXUS_REPO" "$NEXUS_PATH" ${NEXUS_OUT:+--out "$NEXUS_OUT"}

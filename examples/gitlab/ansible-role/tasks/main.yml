@@ -1,0 +1,6 @@
+---
+- name: Write the message of the day
+  ansible.builtin.copy:
+    content: "{{ motd_text }}\n"
+    dest: "{{ motd_path }}"
+    mode: "0644"

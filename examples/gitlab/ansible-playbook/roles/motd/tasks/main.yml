@@ -1,0 +1,7 @@
+---
+- name: Write the message of the day
+  ansible.builtin.copy:
+    content: "{{ motd_text | default('Managed by Ansible') }}\n"
+    dest: /etc/motd
+    mode: "0644"
+  become: true

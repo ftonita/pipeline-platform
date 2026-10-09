@@ -14,6 +14,10 @@
 5. Consumers on `ref: v1` pick the change up on their next pipeline. A breaking change means `v2`, a new
    `schema/platform.v2.schema.json` and `version: 2` in `.platform.yml`; `v1` keeps working unchanged.
 
-**Compatibility promise for `v1.x`:** valid `.platform.yml` files stay valid; generated job names
+The same `v1` tag serves GitLab (`ref: v1`) and Jenkins (`@Library('pipeline-platform@v1')`), so tag once.
+
+**Compatibility promise for `v1.x`:** valid `.platform.yml` files stay valid; the names of the hidden jobs in
+`gitlab/*.yml` (`.vault`, `.nexus-put`, `.ansible-role`, ...), their variables, the Jenkins steps in `vars/` and
+their parameters, and the `pp` command line do not change; generated job names
 (`test`, `build`, `trivy`, `deploy:<env>`, ...) and the variables `IMAGE`, `IMAGE_TAG`,
 `IMAGE_REPOSITORY` do not change.

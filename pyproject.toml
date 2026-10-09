@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pipeline-platform"
 dynamic = ["version"]
-description = "One .platform.yml -> a generated GitLab child pipeline (Vault id_tokens, Nexus/Artifactory, Ansible/Helm/ArgoCD)."
+description = "CI/CD building blocks for GitLab CI and Jenkins (Vault, Nexus, Artifactory, Ansible) and a .platform.yml -> GitLab child pipeline generator."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -32,3 +32,6 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/test_jenkins.py" = ["E501"]  # inline Groovy snippets

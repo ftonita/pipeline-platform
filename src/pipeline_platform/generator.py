@@ -26,8 +26,7 @@ def _vault_ref(ref: dict[str, str], *, file: bool = False, field: str | None = N
         },
         "token": "$VAULT_ID_TOKEN",
     }
-    if file:
-        entry["file"] = True
+    entry["file"] = file  # GitLab defaults to file: true, which would hand jobs a path instead of the value
     return entry
 
 

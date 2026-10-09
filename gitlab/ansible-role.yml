@@ -1,0 +1,33 @@
+# Ready pipeline for a repository that IS an Ansible role. Include together with ansible.yml.
+#
+#   always (MR + default branch)   lint, syntax check
+#   if ANSIBLE_INVENTORY is set    dry run on merge requests, manual apply on the default branch
+#
+# Needs only: variables ANSIBLE_INVENTORY (e.g. tests/inventory) and optionally ANSIBLE_HOSTS.
+
+.ansible-role-rules:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+ansible-role:lint:
+  extends: [.ansible-lint, .ansible-role-rules]
+  stage: test
+
+ansible-role:syntax:
+  extends: [.ansible-role-syntax, .ansible-role-rules]
+  stage: test
+
+ansible-role:check:
+  extends: .ansible-role-check
+  stage: test
+  rules:
+    - if: $ANSIBLE_INVENTORY && $CI_PIPELINE_SOURCE == "merge_request_event"
+
+ansible-role:apply:
+  extends: .ansible-role
+  stage: deploy
+  resource_group: ansible-$CI_PROJECT_PATH_SLUG
+  rules:
+    - if: $ANSIBLE_INVENTORY && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual

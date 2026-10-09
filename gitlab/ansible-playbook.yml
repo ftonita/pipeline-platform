@@ -1,0 +1,33 @@
+# Ready pipeline for a repository with Ansible playbooks. Include together with ansible.yml.
+#
+#   always (MR + default branch)   lint, syntax check
+#   if ANSIBLE_INVENTORY is set    dry run on merge requests, manual run on the default branch
+#
+# Needs only: variable ANSIBLE_INVENTORY (e.g. inventories/prod) and optionally ANSIBLE_PLAYBOOK.
+
+.ansible-playbook-rules:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+ansible-playbook:lint:
+  extends: [.ansible-lint, .ansible-playbook-rules]
+  stage: test
+
+ansible-playbook:syntax:
+  extends: [.ansible-playbook-syntax, .ansible-playbook-rules]
+  stage: test
+
+ansible-playbook:check:
+  extends: .ansible-playbook-check
+  stage: test
+  rules:
+    - if: $ANSIBLE_INVENTORY && $CI_PIPELINE_SOURCE == "merge_request_event"
+
+ansible-playbook:apply:
+  extends: .ansible-playbook
+  stage: deploy
+  resource_group: ansible-$CI_PROJECT_PATH_SLUG
+  rules:
+    - if: $ANSIBLE_INVENTORY && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual

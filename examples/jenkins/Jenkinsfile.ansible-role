@@ -1,0 +1,8 @@
+// Role repository: this is the whole pipeline.
+@Library('pipeline-platform@v1') _
+
+ansibleRolePipeline(
+    role: 'motd',                       // the name your playbooks use for this role
+    inventory: 'tests/inventory',       // drop this line for lint + syntax checks only
+    sshKeyId: 'deploy-ssh',             // Jenkins credential "SSH Username with private key" (optional)
+)

@@ -1,0 +1,22 @@
+# Artifactory upload / download (generic, maven, ... repositories).
+#
+# Variables:  ARTIFACTORY_URL, ARTIFACTORY_REPO, ARTIFACTORY_FILES (globs ok), ARTIFACTORY_DEST (optional)
+# Secrets:    ARTIFACTORY_TOKEN, or ARTIFACTORY_USER + ARTIFACTORY_PASSWORD
+# Uploads carry a SHA-1 checksum and the properties build=<pipeline id>, vcs.revision=<commit>.
+
+variables:
+  PLATFORM_IMAGE: registry.example.com/platform/pipeline-platform:v1
+
+.artifactory-put:
+  image: $PLATFORM_IMAGE
+  script:
+    - |
+      pp artifactory put "$ARTIFACTORY_REPO" $ARTIFACTORY_FILES \
+        --dest "${ARTIFACTORY_DEST:-$CI_PROJECT_NAME/${CI_COMMIT_TAG:-$CI_COMMIT_SHORT_SHA}}" \
+        --prop "build=$CI_PIPELINE_ID" --prop "vcs.revision=$CI_COMMIT_SHA"
+
+# Variables: ARTIFACTORY_PATH (path inside the repository), ARTIFACTORY_OUT (local file, default: basename)
+.artifactory-get:
+  image: $PLATFORM_IMAGE
+  script:
+    - pp artifactory get "$ARTIFACTORY_REPO" "$ARTIFACTORY_PATH" ${ARTIFACTORY_OUT:+--out "$ARTIFACTORY_OUT"}

@@ -1,0 +1,87 @@
+# Ansible building blocks. Work in any repository: a role, a playbook, or an application.
+#
+# Blocks (all hidden jobs, use with `extends:`):
+#   .ansible-lint       ansible-lint on the repository
+#   .ansible-role       apply THE ROLE IN THIS REPOSITORY to ANSIBLE_HOSTS of ANSIBLE_INVENTORY
+#   .ansible-playbook   run ANSIBLE_PLAYBOOK against ANSIBLE_INVENTORY
+#   *-check / *-syntax  dry run (--check --diff) and --syntax-check variants of the two above
+#
+# Variables:  ANSIBLE_INVENTORY (default: inventory), ANSIBLE_PLAYBOOK (default: site.yml),
+#             ANSIBLE_HOSTS (role, default: all), ANSIBLE_ROLE_NAME (role, default: project name),
+#             ANSIBLE_ARGS (any extra ansible-playbook arguments, e.g. "-e env=prod --tags web")
+#             Set them as global `variables:` in your .gitlab-ci.yml or as CI/CD variables.
+# Secrets:    ANSIBLE_PRIVATE_KEY_FILE (File-type variable or Vault `file: true`; ansible reads it natively),
+#             ANSIBLE_REMOTE_USER, SSH_KNOWN_HOSTS (text, `ssh-keyscan host` output),
+#             ANSIBLE_VAULT_PASSWORD_FILE
+# requirements.yml in the repository root is installed automatically (roles and collections).
+
+variables:
+  ANSIBLE_IMAGE: willhallonline/ansible:2.16-alpine-3.19
+  ANSIBLE_LINT_IMAGE: python:3.12-slim
+  ANSIBLE_LINT_VERSION: "26.9.0"
+
+.ansible:
+  image: $ANSIBLE_IMAGE
+  variables:
+    ANSIBLE_FORCE_COLOR: "true"
+  before_script:
+    - |
+      # a repo-local ansible.cfg is ignored in the world-writable CI directory unless pointed at explicitly
+      if [ -f ansible.cfg ]; then export ANSIBLE_CONFIG="$PWD/ansible.cfg"; fi
+      if [ -n "${ANSIBLE_PRIVATE_KEY_FILE:-}" ]; then chmod 600 "$ANSIBLE_PRIVATE_KEY_FILE"; fi
+      if [ -n "${SSH_KNOWN_HOSTS:-}" ]; then
+        mkdir -p ~/.ssh && chmod 700 ~/.ssh && printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      fi
+      if [ -f requirements.yml ]; then ansible-galaxy install -r requirements.yml; fi
+
+.ansible-lint:
+  image: $ANSIBLE_LINT_IMAGE
+  variables:
+    PIP_CACHE_DIR: $CI_PROJECT_DIR/.cache/pip
+  cache:
+    key: ansible-lint
+    paths: [.cache/pip]
+  script:
+    - pip install --quiet "ansible-lint==$ANSIBLE_LINT_VERSION"
+    - ansible-lint
+
+# Job-level variables beat the ones you set globally, so defaults live in the script (`${VAR:-default}`).
+# ANSIBLE_MODE is the only thing the check/syntax variants set.
+.ansible-playbook:
+  extends: .ansible
+  script:
+    - ansible-playbook -i "${ANSIBLE_INVENTORY:-inventory}" "${ANSIBLE_PLAYBOOK:-site.yml}" ${ANSIBLE_MODE:-} ${ANSIBLE_ARGS:-}
+
+.ansible-playbook-check:
+  extends: .ansible-playbook
+  variables:
+    ANSIBLE_MODE: --check --diff
+
+.ansible-playbook-syntax:
+  extends: .ansible-playbook
+  variables:
+    ANSIBLE_INVENTORY: localhost,
+    ANSIBLE_MODE: --syntax-check
+
+# Applies the role that lives in this repository: the repo is linked as a role and a tiny
+# playbook (hosts + that one role) is generated. Role variables: ANSIBLE_ARGS="-e @vars.yml".
+.ansible-role:
+  extends: .ansible
+  script:
+    - |
+      ROLE="${ANSIBLE_ROLE_NAME:-$CI_PROJECT_NAME}"
+      mkdir -p /tmp/roles && ln -sfn "$PWD" "/tmp/roles/$ROLE"
+      printf -- '- hosts: %s\n  roles: [%s]\n' "${ANSIBLE_HOSTS:-all}" "$ROLE" > /tmp/role-play.yml
+      export ANSIBLE_ROLES_PATH="/tmp/roles${ANSIBLE_ROLES_PATH:+:$ANSIBLE_ROLES_PATH}"
+      ansible-playbook -i "${ANSIBLE_INVENTORY:-inventory}" /tmp/role-play.yml ${ANSIBLE_MODE:-} ${ANSIBLE_ARGS:-}
+
+.ansible-role-check:
+  extends: .ansible-role
+  variables:
+    ANSIBLE_MODE: --check --diff
+
+.ansible-role-syntax:
+  extends: .ansible-role
+  variables:
+    ANSIBLE_INVENTORY: localhost,
+    ANSIBLE_MODE: --syntax-check

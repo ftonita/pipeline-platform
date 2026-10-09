@@ -1,0 +1,3 @@
+---
+motd_text: Managed by Ansible
+motd_path: /tmp/motd

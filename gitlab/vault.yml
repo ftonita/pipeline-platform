@@ -1,0 +1,35 @@
+# Vault building blocks for GitLab CI.
+#
+# One-time setup (GitLab group > Settings > CI/CD > Variables):
+#   VAULT_SERVER_URL   https://vault.example.com
+#   VAULT_AUTH_ROLE    name of the Vault JWT role bound to your project (see README, "Vault side")
+#
+# A) `.vault`        GitLab-native secrets (KV v2). No script, no artifacts. Use this by default.
+#                    GitLab stores each secret as a FILE unless you add `file: false`: do that for
+#                    passwords and tokens (the variable then holds the value, not a path).
+# B) `.vault-export` any engine (KV v1, database/aws/... dynamic creds), any auth (JWT, AppRole,
+#                    token), and hand-off of the values to later jobs through an artifact.
+
+variables:
+  PLATFORM_IMAGE: registry.example.com/platform/pipeline-platform:v1   # override via CI/CD variable
+
+.vault:
+  id_tokens:
+    VAULT_ID_TOKEN:
+      aud: $VAULT_SERVER_URL
+
+# Reads VAULT_ENV (value goes into vault.env) and VAULT_FILES (value goes into a 0600 file,
+# the variable holds the path: ssh keys, kubeconfigs, certs). One line per secret:
+#   NAME=[kv2:|kv1:|raw:]mount/path#field
+# Jobs that list this job in `needs:` receive every NAME as a normal variable.
+.vault-export:
+  extends: .vault
+  image: $PLATFORM_IMAGE
+  script:
+    - pp vault export
+  artifacts:
+    access: none          # hide from the UI/API; later jobs still receive it
+    expire_in: 1 hour
+    paths: [.vault-files/]
+    reports:
+      dotenv: vault.env

@@ -1,0 +1,18 @@
+# Role repository: this is the whole pipeline.
+include:
+  - project: platform/pipeline-platform
+    ref: v1
+    file: [gitlab/ansible.yml, gitlab/ansible-role.yml]
+
+variables:
+  ANSIBLE_INVENTORY: tests/inventory   # remove this line for lint + syntax checks only
+  ANSIBLE_HOSTS: all
+  ANSIBLE_ROLE_NAME: motd              # only if the repository name differs from the role name
+
+# Optional: SSH key from Vault instead of a File-type CI/CD variable. Redefine the job; GitLab merges it.
+# ansible-role:apply:
+#   extends: .vault
+#   secrets:
+#     ANSIBLE_PRIVATE_KEY_FILE:
+#       vault: { engine: { name: kv-v2, path: ci }, path: ssh/deploy, field: private_key }
+#       file: true
